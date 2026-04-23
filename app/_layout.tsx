@@ -1,24 +1,17 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/components/useColorScheme';
-
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
+export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+  initialRouteName: 'index',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -27,7 +20,6 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
   }, [error]);
@@ -38,21 +30,55 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
-  if (!loaded) {
-    return null;
-  }
-
-  return <RootLayoutNav />;
-}
-
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  if (!loaded) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+    <ThemeProvider value={DefaultTheme}>
+      <Stack screenOptions={{ headerShown: false }}>
+        {/* INDEX: Login/Cadastro. Blindamos para não voltar por gesto */}
+        <Stack.Screen 
+          name="index" 
+          options={{ 
+            headerShown: false, 
+            gestureEnabled: false 
+          }} 
+        />
+
+        {/* HOME: Quando entrar aqui, o replace vai garantir que não tenha "volta" */}
+        <Stack.Screen 
+          name="home" 
+          options={{ 
+            headerShown: false, 
+            gestureEnabled: false 
+          }} 
+        />
+
+        {/* CHECK-IN: Mantemos seu estilo verde, mas tiramos o gesto de voltar para não bugar o rascunho */}
+        <Stack.Screen 
+          name="checkin" 
+          options={{ 
+            headerShown: true, 
+            title: 'Check-in Gabs',
+            headerTintColor: '#00392D',
+            headerStyle: { backgroundColor: '#EAF9F4' },
+            gestureEnabled: false 
+          }} 
+        />
+        
+        {/* AVATAR: Modal puro. Ele abre por cima e, ao dar navigate ou back, ele some sem deixar rastro */}
+        <Stack.Screen 
+          name="avatar" 
+          options={{ 
+            presentation: 'modal', 
+            headerShown: true, 
+            title: 'Escolha seu Avatar',
+            headerTintColor: '#00392D',
+            headerStyle: { backgroundColor: '#fff' }
+          }} 
+        />
+        
+        {/* Caso ainda use abas, mantemos a referência */}
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );
