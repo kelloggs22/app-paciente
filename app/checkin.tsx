@@ -95,28 +95,49 @@ export default function CheckIn() {
   };
 
   const enviarCheckin = async (finalData: any) => {
-    if (loading) return;
-    setLoading(true);
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
+  if (loading) return;
+  setLoading(true);
 
-      await setDoc(doc(db, "pacientes", user.uid, "checkins", semanaAtual), {
-        ...finalData,
-        data_envio: serverTimestamp(),
-        semana: semanaAtual
-      });
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
 
-      await updateDoc(doc(db, "pacientes", user.uid), {
-        ultima_semana_respondida: semanaAtual
-      });
+    // Salva no Firestore
+    await setDoc(doc(db, "pacientes", user.uid, "checkins", semanaAtual), {
+      ...finalData,
+      data_envio: serverTimestamp(),
+      semana: semanaAtual
+    });
 
-      Alert.alert("Sucesso!", "A Gab recebeu suas respostas 🌿");
-      router.replace('/home');
-    } catch (e) { 
-      Alert.alert("Erro", "Falha ao enviar check-in. Tente novamente."); 
-    } finally { setLoading(false); }
-  };
+    await updateDoc(doc(db, "pacientes", user.uid), {
+      ultima_semana_respondida: semanaAtual
+    });
+
+    // --- CORREÇÃO AQUI ---
+    if (Platform.OS === 'web') {
+      // No Web, evite o Alert.alert do RN para fluxos de navegação
+      window.alert("Sucesso! A Gab recebeu suas respostas 🌿");
+      
+      // Use um pequeno delay para garantir que o estado do Firebase sincronizou
+      setTimeout(() => {
+        router.replace('/home');
+      }, 100);
+      
+    } else {
+      Alert.alert("Sucesso!", "A Gab recebeu suas respostas 🌿", [
+        { text: "OK", onPress: () => router.replace('/home') }
+      ]);
+    }
+
+  } catch (e) { 
+    console.error("Erro ao enviar:", e);
+    // No Web, use alert nativo para garantir visibilidade
+    if (Platform.OS === 'web') window.alert("Erro ao enviar. Verifique sua conexão.");
+    else Alert.alert("Erro", "Falha ao enviar."); 
+  } finally { 
+    setLoading(false); 
+  }
+};
 
   if (verificando) return <View style={styles.center}><ActivityIndicator size="large" color="#26A69A" /></View>;
 
@@ -190,33 +211,75 @@ export default function CheckIn() {
           )}
 
           {p?.type === 'foto' && (
-            <View style={styles.center}>
-              {respostas.foto_livre && <Image source={{uri: respostas.foto_livre}} style={styles.previewImg} />}
-              <TouchableOpacity style={styles.btnSec} disabled={uploadingImage} onPress={async () => {
-                 let result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, quality: 0.5 });
-                 if (!result.canceled) {
-                    setUploadingImage(true);
-                    try {
-                      const formData = new FormData();
-                      formData.append('file', { uri: result.assets[0].uri, type: 'image/jpeg', name: 'checkin.jpg' } as any);
-                      formData.append('upload_preset', UPLOAD_PRESET);
-                      const res = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-                      const data = await res.json();
-                      handleResposta('foto_livre', data.secure_url, true);
-                    } catch (err) {
-                      Alert.alert("Erro", "Falha ao subir imagem.");
-                    } finally {
-                      setUploadingImage(false);
-                    }
-                 }
-              }}>
-                {uploadingImage ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnSecText}>Subir Foto</Text>}
-              </TouchableOpacity>
-              <TouchableOpacity style={{marginTop: 20}} onPress={proximoOuEnviar}>
-                <Text style={{color: '#26A69A'}}>Pular por enquanto</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+  <View style={styles.center}>
+    {respostas.foto_livre && <Image source={{uri: respostas.foto_livre}} style={styles.previewImg} />}
+    
+    <TouchableOpacity 
+      style={styles.btnSec} 
+      disabled={uploadingImage} 
+      onPress={async () => {
+        let result = await ImagePicker.launchImageLibraryAsync({ 
+          allowsEditing: true, 
+          quality: 0.5 
+        });
+
+        if (!result.canceled) {
+          setUploadingImage(true);
+          try {
+            const formData = new FormData();
+            const imageUri = result.assets[0].uri;
+
+            if (Platform.OS === 'web') {
+              // CORREÇÃO PARA WEB: Converter URI em Blob real
+              const response = await fetch(imageUri);
+              const blob = await response.blob();
+              formData.append('file', blob);
+            } else {
+              // MANTÉM PARA NATIVO (iOS/Android)
+              formData.append('file', { 
+                uri: imageUri, 
+                type: 'image/jpeg', 
+                name: 'checkin.jpg' 
+              } as any);
+            }
+
+            formData.append('upload_preset', UPLOAD_PRESET);
+
+            const res = await fetch(CLOUDINARY_URL, { 
+              method: 'POST', 
+              body: formData 
+            });
+
+            const data = await res.json();
+            
+            if (data.secure_url) {
+              handleResposta('foto_livre', data.secure_url, true);
+            } else {
+              throw new Error("Falha no Cloudinary");
+            }
+
+          } catch (err) {
+            console.error("Erro upload:", err);
+            if (Platform.OS === 'web') window.alert("Erro ao subir imagem.");
+            else Alert.alert("Erro", "Falha ao subir imagem.");
+          } finally {
+            setUploadingImage(false);
+          }
+        }
+      }}
+    >
+      {uploadingImage ? (
+        <ActivityIndicator color="#fff" />
+      ) : (
+        <Text style={styles.btnSecText}>Subir Foto</Text>
+      )}
+    </TouchableOpacity>
+
+    <TouchableOpacity style={{marginTop: 20}} onPress={proximoOuEnviar}>
+      <Text style={{color: '#26A69A'}}>Pular por enquanto</Text>
+    </TouchableOpacity>
+  </View>
+)}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

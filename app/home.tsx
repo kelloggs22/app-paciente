@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, SafeAreaView } from 'react-native';
 import { auth, db } from '../firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
@@ -14,6 +15,16 @@ return `${agora.getFullYear()}-W${semana}`;
 };
 
 export default function Home() {
+    useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      // Se o usuário deslogou, limpa tudo e manda para o index
+      setUserData(null);
+      router.replace('/');
+    }
+  });
+  return unsubscribe;
+}, []);
 const router = useRouter();
 const [userData, setUserData] = useState<any>(null);
 const [jaFezCheckin, setJaFezCheckin] = useState(false);
@@ -108,8 +119,8 @@ disabled={jaFezCheckin}
 </Text>
 </View>
 
-<TouchableOpacity style={styles.logoutBtn} onPress={() => { auth.signOut(); router.replace('/'); }}>
-<Text style={styles.logoutText}>Sair da conta</Text>
+<TouchableOpacity style={styles.logoutBtn} onPress={() => auth.signOut()}>
+  <Text style={styles.logoutText}>Sair da conta</Text>
 </TouchableOpacity>
 </View>
 </ScrollView>

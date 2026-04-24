@@ -29,7 +29,16 @@ export default function Index() {
   });
   const [dataTexto, setDataTexto] = useState('Selecionar Data de Nascimento');
 
-  // MONITOR DE AUTENTICAÇÃO: Se já estiver logado e verificado, mata o login e vai para Home
+  // FUNÇÃO PARA ALERTAS HÍBRIDOS (WEB + NATIVO)
+  const notify = (title: string, message: string, onPress?: () => void) => {
+    if (Platform.OS === 'web') {
+      window.alert(`${title}: ${message}`);
+      if (onPress) onPress();
+    } else {
+      Alert.alert(title, message, onPress ? [{ text: "OK", onPress }] : undefined);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user && user.emailVerified) {
@@ -64,7 +73,7 @@ export default function Index() {
     const emailLimpo = form.email.toLowerCase().trim();
     const senhaLimpa = form.senha.trim();
 
-    if (!emailLimpo || !senhaLimpa) return Alert.alert("Erro", "E-mail e senha são obrigatórios.");
+    if (!emailLimpo || !senhaLimpa) return notify("Erro", "E-mail e senha são obrigatórios.");
 
     setLoading(true);
     try {
@@ -72,7 +81,7 @@ export default function Index() {
         const res = await signInWithEmailAndPassword(auth, emailLimpo, senhaLimpa);
         
         if (!res.user.emailVerified) {
-          Alert.alert("E-mail pendente", "Verifique seu e-mail para ativar sua conta.");
+          notify("E-mail pendente", "Verifique seu e-mail para ativar sua conta.");
           await signOut(auth);
           setLoading(false);
           return;
@@ -84,7 +93,7 @@ export default function Index() {
       } else {
         if (!form.nome || !form.username || !form.genero || dataTexto === 'Selecionar Data de Nascimento') {
           setLoading(false);
-          return Alert.alert("Erro", "Preencha todos os campos.");
+          return notify("Erro", "Preencha todos os campos.");
         }
 
         const res = await createUserWithEmailAndPassword(auth, emailLimpo, senhaLimpa);
@@ -102,12 +111,12 @@ export default function Index() {
           criado_em: serverTimestamp()
         });
 
-        Alert.alert("Sucesso!", "Verifique seu e-mail para ativar.", [
-          { text: "Login", onPress: () => setIsLogin(true) }
-        ]);
+        notify("Sucesso!", "Verifique seu e-mail para ativar.", () => {
+          setIsLogin(true);
+        });
       }
     } catch (e: any) {
-      Alert.alert("Atenção", "Erro ao processar. Verifique os dados.");
+      notify("Atenção", "Erro ao processar. Verifique os dados.");
     } finally {
       setLoading(false);
     }
@@ -151,30 +160,65 @@ export default function Index() {
               style={styles.input} 
               value={form.nome} 
               onChangeText={t => setForm({...form, nome: t})}
-              returnKeyType="next"
             />
             
-            <TouchableOpacity style={styles.inputDate} onPress={() => setShowDatePicker(true)}>
-              <Text style={{color: dataTexto.includes('/') ? '#000' : '#999', fontSize: 16}}>{dataTexto}</Text>
-            </TouchableOpacity>
+            {Platform.OS === 'web' ? (
+              <input
+                type="date"
+                style={{
+                  backgroundColor: '#fff',
+                  paddingLeft: 16,
+                  paddingRight: 16,
+                  borderRadius: 15,
+                  marginBottom: 10,
+                  border: '1px solid #B2DFDB',
+                  width: '100%',
+                  height: 52,
+                  fontSize: 16,
+                  color: '#000',
+                  boxSizing: 'border-box',
+                  fontFamily: 'sans-serif',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  outline: 'none'
+                }}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if(val) {
+                    const date = new Date(val + 'T12:00:00');
+                    const dia = date.getDate().toString().padStart(2, '0');
+                    const mes = (date.getMonth() + 1).toString().padStart(2, '0');
+                    const ano = date.getFullYear();
+                    setDataTexto(`${dia}/${mes}/${ano}`);
+                    setForm({ ...form, nascimento: date });
+                  }
+                }}
+              />
+            ) : (
+              <>
+                <TouchableOpacity style={styles.inputDate} onPress={() => setShowDatePicker(true)}>
+                  <Text style={{color: dataTexto.includes('/') ? '#000' : '#999', fontSize: 16}}>{dataTexto}</Text>
+                </TouchableOpacity>
 
-            {showDatePicker && (
-              <View style={Platform.OS === 'ios' ? styles.iosDatePickerContainer : null}>
-                {Platform.OS === 'ios' && (
-                  <TouchableOpacity style={styles.doneButton} onPress={() => setShowDatePicker(false)}>
-                    <Text style={styles.doneButtonText}>Confirmar</Text>
-                  </TouchableOpacity>
+                {showDatePicker && (
+                  <View style={Platform.OS === 'ios' ? styles.iosDatePickerContainer : null}>
+                    {Platform.OS === 'ios' && (
+                      <TouchableOpacity style={styles.doneButton} onPress={() => setShowDatePicker(false)}>
+                        <Text style={styles.doneButtonText}>Confirmar</Text>
+                      </TouchableOpacity>
+                    )}
+                    <DateTimePicker
+                      value={form.nascimento}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={onChangeDate}
+                      maximumDate={new Date()}
+                      textColor="#000000"
+                      accentColor="#26A69A"
+                    />
+                  </View>
                 )}
-                <DateTimePicker
-                  value={form.nascimento}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={onChangeDate}
-                  maximumDate={new Date()}
-                  textColor="#000000" // Corrigi a letra clara no iOS
-                  accentColor="#26A69A"
-                />
-              </View>
+              </>
             )}
 
             <TextInput 
@@ -184,7 +228,6 @@ export default function Index() {
               autoCapitalize="none" 
               value={form.username} 
               onChangeText={t => setForm({...form, username: t})}
-              returnKeyType="next"
             />
           </View>
         )}
@@ -197,7 +240,6 @@ export default function Index() {
           keyboardType="email-address" 
           value={form.email} 
           onChangeText={t => setForm({...form, email: t})}
-          returnKeyType="next"
         />
 
         <TextInput 
@@ -207,8 +249,7 @@ export default function Index() {
           secureTextEntry 
           value={form.senha} 
           onChangeText={t => setForm({...form, senha: t})}
-          returnKeyType="done" // Teclado com CHECK/OK
-          onSubmitEditing={handleAuth} // Baixa teclado e tenta logar
+          onSubmitEditing={handleAuth}
         />
 
         <TouchableOpacity style={styles.mainBtn} onPress={handleAuth} disabled={loading}>
@@ -224,7 +265,7 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
-  logoTopo: {width: 120, height: 120, alignSelf: 'center', marginBottom: 10,}, // Espaço entre a logo e o texto "Bem-vinda"}
+  logoTopo: { width: 120, height: 120, alignSelf: 'center', marginBottom: 10 },
   container: { flexGrow: 1, padding: 30, backgroundColor: '#EAF9F4', justifyContent: 'center' },
   title: { fontSize: 30, fontWeight: 'bold', color: '#00392D', marginBottom: 20, textAlign: 'center' },
   avatarPreview: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#fff', borderWidth: 2, borderColor: '#26A69A' },
@@ -237,7 +278,7 @@ const styles = StyleSheet.create({
   mainBtn: { backgroundColor: '#26A69A', padding: 18, borderRadius: 20, alignItems: 'center', marginTop: 10 },
   btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   switchText: { textAlign: 'center', color: '#00392D', fontWeight: '600' },
-  iosDatePickerContainer: { backgroundColor: 'white', borderRadius: 20, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#B2DFDB' },
+  iosDatePickerContainer: { backgroundColor: 'white', borderRadius: 15, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#B2DFDB' },
   doneButton: { alignItems: 'flex-end', padding: 10 },
   doneButtonText: { color: '#26A69A', fontWeight: 'bold', fontSize: 16 }
-}); 
+});
